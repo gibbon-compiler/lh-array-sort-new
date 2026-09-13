@@ -30,6 +30,12 @@ jobs:
   benchmark:
     runs-on: [self-hosted, Linux, X64]
     container: ghcr.io/ulysses4ever/lh-array-sort:9.10.3
+    # The image is Alpine and the runner picks `sh` (busybox) here, where
+    # "${@:3}" is not array slicing but a single empty string -- which criterion
+    # then reads as a benchmark name filter and matches nothing.
+    defaults:
+      run:
+        shell: bash
     steps:
 
       - uses: actions/checkout@v4
