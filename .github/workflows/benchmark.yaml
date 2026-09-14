@@ -70,11 +70,17 @@ jobs:
             cat "bench-out/$1-$2.csv"
             echo "::endgroup::"
           }
+          # Every algorithm gets two sizes a decade apart: one point can only
+          # show that a number moved, two show whether the shape moved with it.
+          # MergesortPar mirrors Mergesort's sizes so the charts read as a
+          # parallel-speedup comparison at matching n.
           run Insertionsort 1000
           run Insertionsort 10000
           run Mergesort 100000
           run Mergesort 1000000
           run Quicksort 100000
+          run Quicksort 1000000
+          run MergesortPar 100000 +RTS -N4
           run MergesortPar 1000000 +RTS -N4
 
       - name: Check the sorts are actually being measured
