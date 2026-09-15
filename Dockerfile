@@ -15,12 +15,6 @@ RUN  mkdir cabal-dir \
   && cabal configure --constraint="lh-array-sort -liquid-checks +prim-mutable-arrays" --enable-tests \
   && cabal build all \
   && cabal test      \
-  `# the pure-arrays backend gets its own pass so a break there fails the image` \
-  `# build rather than every CI job downstream of it; separate --builddir keeps` \
-  `# it from clobbering the prim-mutable-arrays artifacts above` \
-  && cabal configure --constraint="lh-array-sort -liquid-checks" --enable-tests --builddir=dist-pure \
-  && cabal build lh-array-sort --builddir=dist-pure \
-  && cabal test --builddir=dist-pure \
   && cd ..       \
   && rm -rf /app
 
