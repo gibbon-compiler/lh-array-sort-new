@@ -22,7 +22,7 @@ env:
 jobs:
   test-mutable-arrays:
     runs-on: ubuntu-latest
-    container: ghcr.io/ulysses4ever/lh-array-sort
+    container: ghcr.io/ulysses4ever/lh-array-sort:9.10.3
     steps:
 
       - uses: actions/checkout@v4
@@ -50,7 +50,7 @@ jobs:
 
   test-prim-mutable-arrays:
     runs-on: ubuntu-latest
-    container: ghcr.io/ulysses4ever/lh-array-sort
+    container: ghcr.io/ulysses4ever/lh-array-sort:9.10.3
     steps:
 
       - uses: actions/checkout@v4
@@ -75,7 +75,7 @@ jobs:
 
   test-pure-arrays:
     runs-on: ubuntu-latest
-    container: ghcr.io/ulysses4ever/lh-array-sort
+    container: ghcr.io/ulysses4ever/lh-array-sort:9.10.3
     steps:
 
       - uses: actions/checkout@v4
@@ -101,7 +101,7 @@ jobs:
 
   run-benchrunner:
     runs-on: ubuntu-latest
-    container: ghcr.io/ulysses4ever/lh-array-sort
+    container: ghcr.io/ulysses4ever/lh-array-sort:9.10.3
     steps:
 
       - uses: actions/checkout@v4

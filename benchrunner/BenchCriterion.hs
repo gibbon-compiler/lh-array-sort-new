@@ -112,6 +112,12 @@ mkArrayEnv template =
       !dst = A.makeArray n (A.get template 0)
   in pure $! A.copy template 0 dst 0 n
 
+-- | Demand an element of the sorted result. Forcing the array to WHNF only
+-- reaches its constructor, which leaves the sort itself dead: GHC 9.10.1
+-- discards it outright and reports times that scale O(n) instead of O(n^2).
+forceSorted :: A.Array Int64 -> IO Int64
+forceSorted sorted = pure $! A.get sorted 0
+
 insertionSortGroup :: Int -> IO [Benchmark]
 insertionSortGroup size = do
   templateList <- randList size
@@ -122,7 +128,7 @@ insertionSortGroup size = do
         -- putStrLn $ "Unsort: " ++ show arr
         let !sorted = I.isort_top' arr
         -- putStrLn $ "Sorted: " ++ show sorted
-        pure sorted
+        forceSorted sorted
 
   let grpVector = bench "vector" $ perRunEnv (V.thaw templateVec) $ \vec -> do
         ISDVS.sort vec
@@ -144,7 +150,7 @@ mergeSortGroup size = do
 
   let grpOurs = bench "ours" $ perRunEnv (mkArrayEnv templateArr) $ \arr -> do
         let !sorted = DMS.msort arr
-        pure sorted
+        forceSorted sorted
 
   let grpVector = bench "vector" $ perRunEnv (V.thaw templateVec) $ \vec -> do
         MSDVS.sort vec
@@ -165,7 +171,7 @@ mergeSortParGroup size = do
 
   let grpOursPar = bench "ours-par" $ perRunEnv (mkArrayEnv templateArr) $ \arr -> do
         let !sorted = DMSP.msort arr
-        pure sorted
+        forceSorted sorted
 
   pure [ bgroup ("mergesort-par/" ++ show size)
            [ grpOursPar ] ]
@@ -178,7 +184,7 @@ quickSortGroup size = do
 
   let grpOurs = bench "ours" $ perRunEnv (mkArrayEnv templateArr) $ \arr -> do
         let !sorted = Q.quickSort arr
-        pure sorted
+        forceSorted sorted
 
   let grpVector = bench "vector" $ perRunEnv (V.thaw templateVec) $ \vec -> do
         QSDVS.sort vec

@@ -1,0 +1,121 @@
+name: Benchmarks
+
+# Benchmarks are timing-sensitive and the self-hosted runner has one set of
+# cores, so runs must never overlap. A single global group (no github.ref in it)
+# serialises every run in the repository, and in-progress runs are left alone
+# rather than cancelled so a half-finished measurement never reaches the charts.
+concurrency:
+  group: benchmarks
+  cancel-in-progress: false
+
+on:
+  push:
+    paths-ignore:
+      - "**/README.md"
+    branches:
+      - main
+  pull_request:
+    paths-ignore:
+      - "**/README.md"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  CABAL_DIR: '/cabal-dir'
+
+jobs:
+  benchmark:
+    runs-on: [self-hosted, Linux, X64]
+    container: ghcr.io/ulysses4ever/lh-array-sort:9.10.3
+    # The image is Alpine and the runner picks `sh` (busybox) here, where
+    # "${@:3}" is not array slicing but a single empty string -- which criterion
+    # then reads as a benchmark name filter and matches nothing.
+    defaults:
+      run:
+        shell: bash
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - name: Trust the workspace
+        # The workspace is owned by the runner's uid but git runs as root inside
+        # the container, so without this github-action-benchmark's fetch of
+        # gh-pages dies with "detected dubious ownership".
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Configure
+        # The flags have to be constraints on lh-array-sort rather than bare
+        # -fprim-mutable-arrays: a bare flag applies to the target package
+        # (benchrunner), not to the library it depends on, so the benchmarks
+        # would silently measure the pure list-backed arrays instead.
+        # cabal configure records these in cabal.project.local for later steps.
+        run: |
+          cabal configure \
+            --constraint="lh-array-sort -liquid-checks" \
+            --constraint="lh-array-sort +prim-mutable-arrays"
+
+      - name: Build
+        run: cabal build bench-criterion
+
+      - name: Run benchmarks
+        run: |
+          mkdir -p bench-out
+          run() {
+            echo "::group::$1 n=$2"
+            cabal run -v0 bench-criterion -- \
+              --algo "$1" --size "$2" --csv "bench-out/$1-$2.csv" -L 3 "${@:3}"
+            cat "bench-out/$1-$2.csv"
+            echo "::endgroup::"
+          }
+          # Every algorithm gets two sizes a decade apart: one point can only
+          # show that a number moved, two show whether the shape moved with it.
+          # MergesortPar mirrors Mergesort's sizes so the charts read as a
+          # parallel-speedup comparison at matching n.
+          run Insertionsort 1000
+          run Insertionsort 10000
+          run Mergesort 100000
+          run Mergesort 1000000
+          run Quicksort 100000
+          run Quicksort 1000000
+          run MergesortPar 100000 +RTS -N4
+          run MergesortPar 1000000 +RTS -N4
+
+      - name: Check the sorts are actually being measured
+        # GHC 9.10.1 deleted the in-place writes in Array.Mutable.PrimUnlifted
+        # under -O2 and reported a ~50x speedup that was really a no-op. Ratios
+        # here: honest quadratic growth is ~90x, an elided sort is <=10x.
+        run: |
+          python3 benchmarks/scripts/check_scaling.py --min-ratio 30 \
+            bench-out/Insertionsort-1000.csv bench-out/Insertionsort-10000.csv
+
+      - name: Collect results
+        run: |
+          python3 benchmarks/scripts/criterion_to_benchmark_json.py \
+            -o bench-out/results.json bench-out/*.csv
+
+      - name: Publish to benchmark history
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: lh-array-sort
+          tool: customSmallerIsBetter
+          output-file-path: bench-out/results.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          gh-pages-branch: gh-pages
+          benchmark-data-dir-path: dev/bench
+          # Only main writes history; pull requests compare against it read-only.
+          auto-push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          save-data-file: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          # Ratio of current to previous, so '120%' alerts on a 20% slowdown.
+          # Worst observed run-to-run noise is ~6% (quicksort), so this has
+          # roughly 3x headroom. Alerts comment only -- they never block a merge.
+          alert-threshold: '120%'
+          fail-on-alert: false
+          # comment-always reports every run, so a clean result is visible as
+          # such rather than being indistinguishable from the job not running.
+          # comment-on-alert adds the louder regression comment on top of it.
+          comment-always: true
+          comment-on-alert: true
+          summary-always: true
