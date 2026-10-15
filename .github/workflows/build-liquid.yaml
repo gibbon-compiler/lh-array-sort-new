@@ -22,7 +22,7 @@ env:
 jobs:
   main:
     runs-on: ubuntu-latest
-    container: ghcr.io/ulysses4ever/lh-array-sort
+    container: ghcr.io/ulysses4ever/lh-array-sort:9.10.3
     steps:
 
       - uses: actions/checkout@v4
